@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "AdLens - Meta Ad Library Analyzer",
+  "version": "1.0.0",
+  "description": "Scan, analyze, save and export ads from Meta Ad Library. Competitor research, creative ideas, data analysis.",
+  "permissions": ["storage"],
+  "host_permissions": ["https://www.facebook.com/ads/library/*"],
+  "action": { "default_title": "Toggle AdLens panel" },
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["https://www.facebook.com/ads/library/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
