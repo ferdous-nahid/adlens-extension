@@ -92,17 +92,22 @@
     const landing = la ? decodeLink(la.href) : "";
 
     // media
-    const video = el.querySelector("video");
-    let type = video ? "Video" : "Image";
-    let thumb = video ? video.poster || "" : "";
-    if (!thumb) {
-      const imgs = [...el.querySelectorAll("img")].filter((i) => i.src && (i.naturalWidth > 120 || i.width > 120));
-      imgs.sort((a, b) => b.width * b.height - a.width * a.height);
-      thumb = imgs[0]?.src || "";
-    }
+    const media = [];
+    const seen = new Set();
+    const add = (type, url) => {
+      if (!url || /^(blob|data):/.test(url) || seen.has(url)) return;
+      seen.add(url); media.push({ type, url });
+    };
+    el.querySelectorAll("video").forEach((v) => add("video", v.currentSrc || v.src || v.querySelector("source")?.src));
+    [...el.querySelectorAll("img")]
+      .filter((i) => i.src && (i.naturalWidth > 150 || i.width > 150))
+      .sort((a, b) => b.width * b.height - a.width * a.height)
+      .forEach((i) => add("image", i.src));
+    const type = media.some((m) => m.type === "video") || el.querySelector("video") ? "Video" : "Image";
+    const thumb = (media.find((m) => m.type === "image") || {}).url || "";
     const variants = parseInt((t.match(/(\d+)\s+ads? use this creative/i) || [])[1] || "1", 10);
 
-    return { id, advertiser, status, start, end, days, variants, type, cta, copy, landing, thumb, link: "https://www.facebook.com/ads/library/?id=" + id };
+    return { id, advertiser, status, start, end, days, variants, type, cta, copy, landing, thumb, media, link: "https://www.facebook.com/ads/library/?id=" + id };
   }
 
   function scan() {
@@ -112,7 +117,7 @@
       try {
         const a = parseAd(id, el);
         const old = ads.get(id);
-        ads.set(id, old ? { ...old, ...Object.fromEntries(Object.entries(a).filter(([, v]) => v !== "" && v !== null)) } : a);
+        ads.set(id, old ? { ...old, ...Object.fromEntries(Object.entries(a).filter(([, v]) => v !== "" && v !== null && !(Array.isArray(v) && !v.length))) } : a);
       } catch (e) {}
     });
     if (ads.size !== before) render();
@@ -178,10 +183,28 @@
   }
 
   // ---------- export ----------
-  const FIELDS = ["id", "advertiser", "status", "start", "end", "days", "variants", "type", "cta", "copy", "landing", "thumb", "link"];
+  const FIELDS = ["id", "advertiser", "status", "start", "end", "days", "variants", "type", "cta", "copy", "landing", "thumb", "media_files", "media_urls", "link"];
+  const extOf = (u, t) => {
+    const m = u.split("?")[0].match(/\.(jpe?g|png|webp|gif|mp4|webm|mov)$/i);
+    return m ? m[1].toLowerCase() : t === "video" ? "mp4" : "jpg";
+  };
+  const mediaFiles = (a) => (a.media || []).map((m, i) => `AdLens/${stamp()}/${a.id}_${i + 1}.${extOf(m.url, m.type)}`);
   function toCSV(rows) {
     const q = (v) => '"' + String(v ?? "").replace(/"/g, '""') + '"';
-    return "\ufeff" + [FIELDS.join(",")].concat(rows.map((r) => FIELDS.map((f) => q(r[f])).join(","))).join("\n");
+    const full = rows.map((r) => ({ ...r, media_files: mediaFiles(r).join(" | "), media_urls: (r.media || []).map((m) => m.url).join(" | ") }));
+    return "\ufeff" + [FIELDS.join(",")].concat(full.map((r) => FIELDS.map((f) => q(r[f])).join(","))).join("\n");
+  }
+  async function downloadMedia(rows, btn) {
+    const items = [];
+    rows.forEach((a) => { const f = mediaFiles(a); (a.media || []).forEach((m, i) => items.push({ url: m.url, filename: f[i] })); });
+    if (!items.length) { btn.textContent = "No media found"; return; }
+    let n = 0;
+    for (const it of items) {
+      chrome.runtime.sendMessage({ type: "download", ...it });
+      btn.textContent = `Media ${++n}/${items.length}`;
+      await new Promise((r) => setTimeout(r, 300));
+    }
+    btn.textContent = `Media done (${items.length})`;
   }
   function download(name, text, mime) {
     const a = document.createElement("a");
@@ -243,6 +266,7 @@
       <button class="b" data-a="scroll">Auto-scroll</button>
       <input id="tgt" type="number" value="100" min="10" step="10" style="width:64px" title="Auto-scroll target ad count">
       <button class="b" data-a="csv">CSV</button>
+      <button class="b" data-a="media">Media</button>
       <button class="b" data-a="json">JSON</button>
       <button class="b" data-a="clear">Clear</button>
     </div>
@@ -270,6 +294,7 @@
         <div class="act">
           <span data-save="${a.id}">${isSaved ? "★ Saved" : "☆ Save"}</span>
           <span data-copy="${a.id}">Copy text</span>
+          <span data-media="${a.id}">Media (${(a.media || []).length})</span>
           <a href="${esc(a.link)}" target="_blank">Open</a>
           ${a.landing ? `<a href="${esc(a.landing)}" target="_blank">Landing</a>` : ""}
         </div>
@@ -299,6 +324,10 @@
       if (saved[id]) delete saved[id]; else saved[id] = ads.get(id) || saved[id];
       persist(); return render();
     }
+    if (t.dataset.media) {
+      const a = ads.get(t.dataset.media) || saved[t.dataset.media];
+      return downloadMedia(a ? [a] : [], t);
+    }
     if (t.dataset.copy) {
       const a = ads.get(t.dataset.copy) || saved[t.dataset.copy];
       await navigator.clipboard.writeText(a?.copy || "").catch(() => {});
@@ -310,6 +339,7 @@
     if (act === "scan") { const n = scan(); t.textContent = "Scan (+" + n + ")"; }
     if (act === "live") { live = !live; t.classList.toggle("on", live); }
     if (act === "csv") download(`adlens-${stamp()}.csv`, toCSV(rows), "text/csv;charset=utf-8");
+    if (act === "media") downloadMedia(rows, t);
     if (act === "json") download(`adlens-${stamp()}.json`, JSON.stringify(rows, null, 2), "application/json");
     if (act === "clear") { ads.clear(); render(); }
     if (act === "scroll") {

@@ -10,7 +10,8 @@ A lightweight Chrome extension (Manifest V3) that scans, analyzes, saves and exp
 - **Filter & sort** – Filter by advertiser, copy, CTA or domain; sort by days running, variants or name.
 - **Insights tab** – Totals, active and video share, average run length, average copy length, top advertisers, longest-running ads (winner signal), top CTAs, top keywords, common hooks (first 3 words) and landing domains.
 - **Saved tab** – Star ads to keep them across sessions (stored with `chrome.storage.local`).
-- **Export** – Download the current list as **CSV** or **JSON**.
+- **Media download** – Download every ad's images and videos in one click (**Media** button), or per ad from its card. Files are saved to `Downloads/AdLens/<date>/<library-id>_<n>.<ext>`.
+- **Export** – Download the current list as **CSV** or **JSON**. The CSV includes `media_files` and `media_urls` columns, so each row links to its downloaded media.
 - **Copy text** – Copy an ad's copy to the clipboard in one click.
 
 ## Installation
@@ -28,13 +29,13 @@ A lightweight Chrome extension (Manifest V3) that scans, analyzes, saves and exp
 1. Go to the [Meta Ad Library](https://www.facebook.com/ads/library/) and search for a keyword or advertiser.
 2. The AdLens panel appears on the page. Click the extension icon to show or hide it.
 3. Click **Scan page**, or leave **Live scan** on and scroll. Use **Auto-scroll** to collect ads up to the target count.
-4. Browse the **Ads**, **Insights** and **Saved** tabs, filter or sort, then export with **CSV** / **JSON**.
+4. Browse the **Ads**, **Insights** and **Saved** tabs, filter or sort, then export with **CSV** / **JSON**, or click **Media** to download all images and videos.
 
 ## Project structure
 
 ```
 ├── manifest.json   # Extension manifest (MV3)
-├── background.js   # Toggles the panel when the toolbar icon is clicked
+├── background.js   # Toggles the panel and handles media downloads
 └── content.js      # Ad extraction, analysis, UI panel, storage and export
 ```
 
@@ -43,9 +44,10 @@ A lightweight Chrome extension (Manifest V3) that scans, analyzes, saves and exp
 | Permission | Why |
 |---|---|
 | `storage` | Keep your saved ads between sessions |
+| `downloads` | Save ad images and videos to your Downloads folder |
 | `https://www.facebook.com/ads/library/*` | Run only on Meta Ad Library pages |
 
-No data is sent anywhere — all scanning and analysis happens in your browser.
+No data is sent anywhere — all scanning and analysis happens in your browser. Media files are downloaded straight from Meta's servers to your computer.
 
 ## Notes
 
