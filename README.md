@@ -1,5 +1,7 @@
 # AdLens – Meta Ad Library Analyzer
 
+<img src="icons/icon128.png" alt="AdLens icon" width="96">
+
 A lightweight Chrome extension (Manifest V3) that scans, analyzes, saves and exports ads from the [Meta Ad Library](https://www.facebook.com/ads/library/). Built for competitor research, creative inspiration and quick data analysis — no account, server or API key needed. Everything runs locally in your browser.
 
 ## Features
@@ -35,6 +37,7 @@ A lightweight Chrome extension (Manifest V3) that scans, analyzes, saves and exp
 
 ```
 ├── manifest.json   # Extension manifest (MV3)
+├── icons/          # Extension icons (16, 32, 48, 128 px)
 ├── background.js   # Toggles the panel and handles media downloads
 └── content.js      # Ad extraction, analysis, UI panel, storage and export
 ```
